@@ -56,24 +56,40 @@ func getTopStories(numStories int) ([]item, error) {
 		return nil, errors.New("Failed to load top stories")
 	}
 	var stories []item
+	at := 0
+	for len(stories) < numStories {
+		//	need numStories - current stories
+		need := numStories - len(stories)
+		stories = append(stories, getStories(ids[at:at+need])...)
+		at += need
+	}
+	return stories, nil
+}
+
+func isStoryLink(item item) bool {
+	return item.Type == "story" && item.URL != ""
+}
+
+func getStories(ids []int) []item {
+	var client hn.Client
+	var stories []item
 	type result struct {
 		index int
 		item  item
 		err   error
 	}
 	resultCh := make(chan result) //	creates a channel to funnel stories
-
-	for i := 0; i < numStories; i++ {
+	for i := 0; i < len(ids); i++ {
 		go func(index, id int) {
 			hnItem, err := client.GetItem(id)
 			if err != nil {
 				resultCh <- result{index: index, err: err} //	if error, sends to results channel
 			}
 			resultCh <- result{index: index, item: parseHNItem(hnItem)} //	sends the item to the results channel
-		}(i, ids[i])
+		}(i, ids[i]) //	continues calling function with incrementing values
 	}
 	var results []result
-	for i := 0; i < numStories; i++ {
+	for i := 0; i < len(ids); i++ {
 		results = append(results, <-resultCh) //	puts all results from result channel into results slice
 	}
 	//	Sorts are results slice by index number
@@ -89,11 +105,7 @@ func getTopStories(numStories int) ([]item, error) {
 		}
 
 	}
-	return stories, nil
-}
-
-func isStoryLink(item item) bool {
-	return item.Type == "story" && item.URL != ""
+	return stories
 }
 
 func parseHNItem(hnItem hn.Item) item {
