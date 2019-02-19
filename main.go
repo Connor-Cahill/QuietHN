@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -55,18 +56,38 @@ func getTopStories(numStories int) ([]item, error) {
 		return nil, errors.New("Failed to load top stories")
 	}
 	var stories []item
-	for _, id := range ids {
-		hnItem, err := client.GetItem(id)
-		if err != nil {
+	type result struct {
+		index int
+		item  item
+		err   error
+	}
+	resultCh := make(chan result) //	creates a channel to funnel stories
+
+	for i := 0; i < numStories; i++ {
+		go func(index, id int) {
+			hnItem, err := client.GetItem(id)
+			if err != nil {
+				resultCh <- result{index: index, err: err} //	if error, sends to results channel
+			}
+			resultCh <- result{index: index, item: parseHNItem(hnItem)} //	sends the item to the results channel
+		}(i, ids[i])
+	}
+	var results []result
+	for i := 0; i < numStories; i++ {
+		results = append(results, <-resultCh) //	puts all results from result channel into results slice
+	}
+	//	Sorts are results slice by index number
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].index < results[j].index
+	})
+	for _, res := range results {
+		if res.err != nil {
 			continue
 		}
-		item := parseHNItem(hnItem)
-		if isStoryLink(item) {
-			stories = append(stories, item)
-			if len(stories) >= numStories {
-				break
-			}
+		if isStoryLink(res.item) {
+			stories = append(stories, res.item)
 		}
+
 	}
 	return stories, nil
 }
