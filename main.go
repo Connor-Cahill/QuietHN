@@ -58,12 +58,11 @@ func getTopStories(numStories int) ([]item, error) {
 	var stories []item
 	at := 0
 	for len(stories) < numStories {
-		//	need numStories - current stories
-		need := numStories - len(stories)
+		need := (numStories - len(stories)) * 5 / 4 //	number of stories minus length of our stories slice
 		stories = append(stories, getStories(ids[at:at+need])...)
 		at += need
 	}
-	return stories, nil
+	return stories[:numStories], nil
 }
 
 func isStoryLink(item item) bool {
