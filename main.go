@@ -33,7 +33,7 @@ func main() {
 func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		stories, err := getTopStories(numStories)
+		stories, err := getCachedStories(numStories)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -47,6 +47,26 @@ func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 			return
 		}
 	})
+}
+
+var (
+	cache           []item
+	cacheExpiration time.Time
+)
+
+func getCachedStories(numStories int) ([]item, error) {
+	//	if cache is not expired just return cache
+	if time.Now().Sub(cacheExpiration) < 0 {
+		return cache, nil
+	}
+	stories, err := getTopStories(numStories)
+	if err != nil {
+		return nil, err
+	}
+	cache = stories
+	cacheExpiration = time.Now().Add(15 * time.Second) //	sets the cachexpiration to 15 seconds
+	return stories, nil
+
 }
 
 func getTopStories(numStories int) ([]item, error) {
@@ -70,7 +90,6 @@ func isStoryLink(item item) bool {
 }
 
 func getStories(ids []int) []item {
-	var client hn.Client
 	var stories []item
 	type result struct {
 		index int
@@ -80,6 +99,7 @@ func getStories(ids []int) []item {
 	resultCh := make(chan result) //	creates a channel to funnel stories
 	for i := 0; i < len(ids); i++ {
 		go func(index, id int) {
+			var client hn.Client
 			hnItem, err := client.GetItem(id)
 			if err != nil {
 				resultCh <- result{index: index, err: err} //	if error, sends to results channel
