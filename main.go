@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/connor-cahill/quietHN/hn"
@@ -52,9 +53,12 @@ func handler(numStories int, tpl *template.Template) http.HandlerFunc {
 var (
 	cache           []item
 	cacheExpiration time.Time
+	cacheMutex      sync.Mutex
 )
 
 func getCachedStories(numStories int) ([]item, error) {
+	cacheMutex.Lock()         //	Locks so no other go routines be happenin
+	defer cacheMutex.Unlock() //	when function exits, unlocks mutext
 	//	if cache is not expired just return cache
 	if time.Now().Sub(cacheExpiration) < 0 {
 		return cache, nil
