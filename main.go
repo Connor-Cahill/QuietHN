@@ -64,7 +64,7 @@ func getCachedStories(numStories int) ([]item, error) {
 		return nil, err
 	}
 	cache = stories
-	cacheExpiration = time.Now().Add(15 * time.Second) //	sets the cachexpiration to 15 seconds
+	cacheExpiration = time.Now().Add(15 * time.Minute) //	sets the cachexpiration to 15 minutes
 	return stories, nil
 
 }
